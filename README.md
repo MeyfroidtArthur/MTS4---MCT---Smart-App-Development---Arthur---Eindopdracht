@@ -1,2 +1,2 @@
-###MCT---Smart-App-Development---Eindopdracht###
+###MCT---Smart-App-Development---Eindopdracht
 ###Arthur###
