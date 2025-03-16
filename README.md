@@ -27,3 +27,7 @@ Mijn idee is een agenda-app met de volgende functies:
 5. Mensen kunnen toevoegen aan afspraken
 6. Melding sturen naar toegevoegde personen dat je vertrokken bent
 7. Connectie met Google Agenda, Outlook, ...
+
+## Auteur
+
+**Arthur Meyfroidt**
