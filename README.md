@@ -13,7 +13,7 @@ Mijn idee is een agenda-app met deze functies:
 - Afspraak aanpassen
 - Afspraak verwijderen
 - Automatische herinnering 1 dag van tevoren
-- Berekening van jouw locatie naar afspraaklocatie om je op tijd te waarschuwen wanneer je moet vertrekken
+- Berekening tijd van jouw locatie naar afspraaklocatie om optijd een herinnering te geven
 - Maand en planning view
 - Meldingen in app
 
