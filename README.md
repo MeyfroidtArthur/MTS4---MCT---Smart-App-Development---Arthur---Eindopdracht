@@ -1,29 +1,16 @@
-# MCT - Smart App Development - Eindopdracht
+# newagendaapp
 
-Mijn idee is een agenda-app met de volgende functies:
+A new Flutter project.
 
-## Must haves
+## Getting Started
 
-- **Afspraak maken** met de volgende informatie:
-  - Datum (maximaal 1 jaar vooruit)
-  - Tijdschema
-  - Titel
-  - Beschrijving
-  - Locatie
-  - Transport
-- **Afspraak aanpassen**
-- **Afspraak verwijderen**
-- **Automatische herinnering** 1 dag van tevoren
-- **Berekening van reistijd** van jouw locatie naar de afspraaklocatie om op tijd een herinnering te geven
-- **Maand- en planningweergave**
-- **Meldingen** in de app
+This project is a starting point for a Flutter application.
 
-## Nice to have
+A few resources to get you started if this is your first Flutter project:
 
-1. Meldingen buiten de app
-2. Jaar-, week- en dagweergave
-3. Afspraken verder dan 1 jaar vooruit
-4. Vorige maanden bekijken
-5. Mensen kunnen toevoegen aan afspraken
-6. Melding sturen naar toegevoegde personen dat je vertrokken bent
-7. Connectie met Google Agenda, Outlook, ...
+- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
+- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+
+For help getting started with Flutter development, view the
+[online documentation](https://docs.flutter.dev/), which offers tutorials,
+samples, guidance on mobile development, and a full API reference.
