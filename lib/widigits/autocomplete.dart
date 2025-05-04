@@ -3,18 +3,37 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 class OsmAddressSearchWidget extends StatefulWidget {
+  final String? initialValue; // Add an initial value
   final Function(double lat, double lon, String? displayName)
-  onCoordinatesSelected; // Make displayName nullable
-  OsmAddressSearchWidget({required this.onCoordinatesSelected});
+  onCoordinatesSelected;
+
+  OsmAddressSearchWidget({
+    this.initialValue, // Optional initial value
+    required this.onCoordinatesSelected,
+  });
 
   @override
   _OsmAddressSearchWidgetState createState() => _OsmAddressSearchWidgetState();
 }
 
 class _OsmAddressSearchWidgetState extends State<OsmAddressSearchWidget> {
-  final TextEditingController _controller = TextEditingController();
+  late TextEditingController _controller;
   List<Map<String, dynamic>> _suggestions = [];
   OverlayEntry? _overlayEntry; // Make this nullable
+
+  @override
+  void initState() {
+    super.initState();
+    // Set the controller with the initial value
+    _controller = TextEditingController(text: widget.initialValue ?? '');
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _removeOverlay(); // Ensure the overlay is removed during dispose
+    super.dispose();
+  }
 
   // Fetch address suggestions from the Nominatim API
   Future<void> _searchAddress(String query) async {
@@ -109,13 +128,6 @@ class _OsmAddressSearchWidgetState extends State<OsmAddressSearchWidget> {
       _overlayEntry?.remove();
       _overlayEntry = null; // Reset after removal
     }
-  }
-
-  @override
-  void dispose() {
-    // Ensure the overlay is removed during dispose
-    _removeOverlay();
-    super.dispose();
   }
 
   @override

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:newagendaapp/overlay/createplan.dart';
+import 'package:newagendaapp/pages/planning.dart';
 import 'package:newagendaapp/widigits/nav.dart';
 import 'package:location/location.dart';
 import 'package:http/http.dart' as http;
@@ -11,8 +12,19 @@ import 'dart:async';
 
 class LocationPage extends StatefulWidget {
   final String uid;
+  final String? initialLocationName; // Add initial location name
+  final double? initialLatitude; // Add initial latitude
+  final double? initialLongitude; // Add initial longitude
+  final String? initialTransportMode;
 
-  const LocationPage({Key? key, required this.uid}) : super(key: key);
+  const LocationPage({
+    Key? key,
+    required this.uid,
+    this.initialLocationName,
+    this.initialLatitude,
+    this.initialLongitude,
+    this.initialTransportMode,
+  }) : super(key: key);
 
   @override
   _LocationState createState() => _LocationState();
@@ -44,6 +56,22 @@ class _LocationState extends State<LocationPage> {
   @override
   void initState() {
     super.initState();
+    // Set initial location if provided
+    if (widget.initialLatitude != null && widget.initialLongitude != null) {
+      _destinationLat = widget.initialLatitude!;
+      _destinationLon = widget.initialLongitude!;
+    }
+
+    // Set initial transport mode if provided
+    if (widget.initialTransportMode != null) {
+      _selectedTransport = widget.initialTransportMode!;
+    }
+
+    print(
+      "Coordinates: ${widget.initialLatitude}, ${widget.initialLongitude}, transport: $_selectedTransport",
+    );
+
+    _destinationController.text = widget.initialLocationName ?? '';
     _getCurrentLocation();
   }
 
@@ -301,6 +329,8 @@ class _LocationState extends State<LocationPage> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: OsmAddressSearchWidget(
+                        initialValue:
+                            widget.initialLocationName, // Set the initial value
                         onCoordinatesSelected:
                             (lat, lon, _) => _updateDestination(lat, lon),
                       ),
@@ -417,7 +447,18 @@ class _LocationState extends State<LocationPage> {
           ),
         ),
         if (_isOverlayVisible)
-          CreatePlanOverlay(onClose: _toggleOverlay, uid: widget.uid),
+          CreatePlanOverlay(
+            onClose: _toggleOverlay,
+            uid: widget.uid,
+            onSave: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => Planning(uid: widget.uid),
+                ),
+              ); //
+            },
+          ),
       ],
     );
   }

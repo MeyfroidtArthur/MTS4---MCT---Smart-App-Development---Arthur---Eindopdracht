@@ -157,4 +157,38 @@ class FirestoreAccess {
       print("Error deleting appointment: $e");
     }
   }
+
+  Future<void> UpdateAppointment(
+    String uid,
+    String appointmentId,
+    String title,
+    String description,
+    DateTime startDateTime,
+    DateTime endDateTime,
+    String destinationName,
+    double destinationLatitude,
+    double destinationLongitude,
+    String transport,
+    String color,
+  ) async {
+    print("uid: $uid");
+    print("appointmentId: $appointmentId");
+    final docRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('appointments')
+        .doc(appointmentId);
+
+    await docRef.update({
+      'title': title,
+      'description': description,
+      'startTime': startDateTime,
+      'endTime': endDateTime,
+      'locationName': destinationName,
+      'latitude': destinationLatitude,
+      'longitude': destinationLongitude,
+      'TravelMode': transport,
+      'Color': color,
+    });
+  }
 }

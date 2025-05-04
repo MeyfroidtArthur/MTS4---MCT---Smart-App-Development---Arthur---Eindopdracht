@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:newagendaapp/pages/planning.dart';
 import 'package:newagendaapp/widigits/autocomplete.dart';
 import 'package:newagendaapp/service/firebaseServices.dart'; // Import FirestoreAccess
 
 class CreatePlanOverlay extends StatefulWidget {
   final VoidCallback onClose;
   final String uid;
-  final VoidCallback? onSave; // Optional callback for saving
+  final VoidCallback? onSave;
+  final Map<String, dynamic>? initialData; // Voeg initialData toe voor bewerken
 
   const CreatePlanOverlay({
     required this.onClose,
     required this.uid,
-    this.onSave, // Optional parameter
+    this.onSave,
+    this.initialData, // Optionele parameter voor initiële gegevens
   });
 
   @override
@@ -20,21 +21,46 @@ class CreatePlanOverlay extends StatefulWidget {
 }
 
 class _CreatePlanOverlayState extends State<CreatePlanOverlay> {
-  final FirestoreAccess firestoreAccess =
-      FirestoreAccess(); // Initialize FirestoreAccess
+  final FirestoreAccess firestoreAccess = FirestoreAccess();
 
-  final TextEditingController titleController = TextEditingController();
-  final TextEditingController descriptionController = TextEditingController();
+  late TextEditingController titleController;
+  late TextEditingController descriptionController;
   double? destinationLatitude;
   double? destinationLongitude;
-  String destinationName =
-      'Destination'; // Add a variable to store the destination name
-
+  String destinationName = 'Destination';
   DateTime startDateTime = DateTime.now();
   DateTime endDateTime = DateTime.now().add(Duration(hours: 1));
   String selectedTransport = 'car';
   Color selectedColor = Colors.blue;
-  OverlayEntry? _overlayEntry;
+
+  @override
+  void initState() {
+    super.initState();
+
+    titleController = TextEditingController(
+      text: widget.initialData?['title'] ?? '',
+    );
+    descriptionController = TextEditingController(
+      text: widget.initialData?['description'] ?? '',
+    );
+    destinationLatitude = widget.initialData?['destinationLatitude'] ?? 0.0;
+    destinationLongitude = widget.initialData?['destinationLongitude'] ?? 0.0;
+    destinationName = widget.initialData?['destinationName'] ?? '';
+    startDateTime = widget.initialData?['startDateTime'] ?? DateTime.now();
+    endDateTime =
+        widget.initialData?['endDateTime'] ??
+        DateTime.now().add(Duration(hours: 1));
+    selectedTransport = widget.initialData?['selectedTransport'] ?? 'car';
+    selectedColor =
+        widget.initialData?['selectedColor'] != null
+            ? Color(
+              int.parse(
+                widget.initialData!['selectedColor'].substring(1),
+                radix: 16,
+              ),
+            )
+            : Colors.blue;
+  }
 
   Future<void> _pickDateTime({required bool isStart}) async {
     DateTime initialDate = isStart ? startDateTime : endDateTime;
@@ -108,7 +134,7 @@ class _CreatePlanOverlayState extends State<CreatePlanOverlay> {
     return GestureDetector(
       onTap: () {
         setState(() {
-          selectedColor = color;
+          selectedColor = color; // Update de geselecteerde kleur
         });
       },
       child: Container(
@@ -161,7 +187,7 @@ class _CreatePlanOverlayState extends State<CreatePlanOverlay> {
                                 destinationLatitude == null ||
                                 destinationLongitude == null) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
+                                const SnackBar(
                                   content: Text('Please fill in all fields'),
                                 ),
                               );
@@ -169,28 +195,47 @@ class _CreatePlanOverlayState extends State<CreatePlanOverlay> {
                             }
 
                             try {
-                              await firestoreAccess.CreateAppointment(
-                                widget.uid,
-                                titleController.text,
-                                descriptionController.text,
-                                startDateTime,
-                                endDateTime,
-                                destinationName,
-                                destinationLatitude!,
-                                destinationLongitude!,
-                                selectedTransport,
-                                '#${selectedColor.value.toRadixString(16).padLeft(8, '0').toUpperCase()}',
-                              );
-                              print("Appointment saved successfully");
-                              if (widget.onSave != null) {
-                                widget
-                                    .onSave!(); // Trigger the callback if provided
+                              if (widget.initialData != null &&
+                                  widget.initialData!['id'] != null) {
+                                // Update the existing appointment
+                                await firestoreAccess.UpdateAppointment(
+                                  widget.uid,
+                                  widget
+                                      .initialData!['id'], // Use the appointment ID
+                                  titleController.text,
+                                  descriptionController.text,
+                                  startDateTime,
+                                  endDateTime,
+                                  destinationName,
+                                  destinationLatitude!,
+                                  destinationLongitude!,
+                                  selectedTransport,
+                                  '#${selectedColor.value.toRadixString(16).padLeft(8, '0').toUpperCase()}',
+                                );
+                              } else {
+                                // Create a new appointment
+                                await firestoreAccess.CreateAppointment(
+                                  widget.uid,
+                                  titleController.text,
+                                  descriptionController.text,
+                                  startDateTime,
+                                  endDateTime,
+                                  destinationName,
+                                  destinationLatitude!,
+                                  destinationLongitude!,
+                                  selectedTransport,
+                                  '#${selectedColor.value.toRadixString(16).padLeft(8, '0').toUpperCase()}',
+                                );
                               }
-                              widget.onClose(); // Close the overlay
+
+                              if (widget.onSave != null) {
+                                widget.onSave!(); // Trigger the reload callback
+                              }
+                              widget.onClose();
                             } catch (e) {
                               print("Failed to save appointment: $e");
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
+                                const SnackBar(
                                   content: Text('Failed to save appointment'),
                                 ),
                               );
@@ -270,12 +315,14 @@ class _CreatePlanOverlayState extends State<CreatePlanOverlay> {
 
                     // Destination search
                     OsmAddressSearchWidget(
+                      initialValue:
+                          destinationName, // Geef de huidige bestemming door
                       onCoordinatesSelected:
                           (lat, lon, name) => _updateDestination(
                             lat,
                             lon,
-                            name!,
-                          ), // Use the name
+                            name ?? 'Onbekende locatie',
+                          ),
                     ),
                     SizedBox(height: 20),
 
@@ -283,10 +330,13 @@ class _CreatePlanOverlayState extends State<CreatePlanOverlay> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _transportIcon('car', Icons.directions_car),
-                        _transportIcon('bike', Icons.directions_bike),
-                        _transportIcon('walk', Icons.directions_walk),
-                        _transportIcon('bus', Icons.directions_bus),
+                        _transportIcon('driving-car', Icons.directions_car),
+                        _transportIcon(
+                          'cycling-regular',
+                          Icons.directions_bike,
+                        ),
+                        _transportIcon('foot-walking', Icons.directions_walk),
+                        _transportIcon('driving-train', Icons.directions_bus),
                       ],
                     ),
                     SizedBox(height: 24),

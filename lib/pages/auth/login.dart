@@ -27,16 +27,16 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    final user = await _firebaseService.signInUser(email, password);
-    if (user != null) {
+    final userId = await _firebaseService.signInUser(email, password);
+    if (userId != null) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Succesvol ingelogd!')));
 
-      // Navigate to Planning page
+      // Navigate to Planning page with the userId
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => Planning(uid: user)),
+        MaterialPageRoute(builder: (context) => Planning(uid: userId)),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

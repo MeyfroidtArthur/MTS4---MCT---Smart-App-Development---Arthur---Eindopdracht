@@ -1,16 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:newagendaapp/overlay/createplan.dart';
+import 'package:newagendaapp/pages/planning.dart';
 
 class AppointmentInfoOverlay extends StatelessWidget {
   final Map<String, dynamic> appointment;
   final VoidCallback onClose;
   final Future<void> Function(String appointmentId) onDelete;
+  final VoidCallback onReload; // Add this callback
+  final String uid;
 
   const AppointmentInfoOverlay({
     Key? key,
     required this.appointment,
     required this.onClose,
     required this.onDelete,
+    required this.onReload, // Initialize the callback
+    required this.uid,
   }) : super(key: key);
 
   @override
@@ -251,8 +257,51 @@ class AppointmentInfoOverlay extends StatelessWidget {
                           ),
                           ElevatedButton.icon(
                             onPressed: () {
-                              // Handle edit
-                              print('Edit appointment');
+                              showDialog(
+                                context: context,
+                                builder: (BuildContext context) {
+                                  return CreatePlanOverlay(
+                                    onClose: () {
+                                      Navigator.of(context).pop();
+                                    },
+                                    uid: uid ?? '', // Zorg dat uid niet null is
+                                    onSave: () {
+                                      Navigator.of(context).pop();
+                                      onReload(); // Trigger the reload callback
+                                    },
+                                    initialData: {
+                                      'id':
+                                          appointment['id'] ??
+                                          '', // Gebruik een lege string als fallback
+                                      'title':
+                                          appointment['title'] ?? 'Geen titel',
+                                      'description':
+                                          appointment['description'] ??
+                                          'Geen beschrijving',
+                                      'startDateTime':
+                                          appointment['startTime']?.toDate() ??
+                                          DateTime.now(),
+                                      'endDateTime':
+                                          appointment['endTime']?.toDate() ??
+                                          DateTime.now().add(
+                                            Duration(hours: 1),
+                                          ),
+                                      'destinationName':
+                                          appointment['locationName'] ??
+                                          'Geen locatie',
+                                      'destinationLatitude':
+                                          appointment['latitude'] ?? 0.0,
+                                      'destinationLongitude':
+                                          appointment['longitude'] ?? 0.0,
+                                      'selectedTransport':
+                                          appointment['TravelMode'] ?? 'car',
+                                      'selectedColor':
+                                          appointment['Color'] ??
+                                          '#FF0000', // Standaardkleur rood
+                                    },
+                                  );
+                                },
+                              );
                             },
                             icon: const Icon(Icons.edit, color: Colors.white),
                             label: const Text(

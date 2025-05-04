@@ -1,3 +1,4 @@
+import 'package:newagendaapp/pages/location.dart';
 import 'package:newagendaapp/service/firebaseServices.dart'; // Import FirestoreAccess
 import 'package:flutter/material.dart';
 import 'package:newagendaapp/overlay/createplan.dart';
@@ -19,6 +20,8 @@ class _PlanningState extends State<Planning> {
       GlobalKey<ScaffoldMessengerState>();
   bool _isOverlayVisible = false;
   List<Map<String, dynamic>> _appointments = []; // Store appointments
+  Map<String, dynamic>?
+  _editingAppointment; // Store the appointment being edited
 
   @override
   void initState() {
@@ -26,9 +29,11 @@ class _PlanningState extends State<Planning> {
     _fetchAppointments(); // Fetch appointments when the page loads
   }
 
-  void _toggleOverlay() {
+  void _toggleOverlay({Map<String, dynamic>? appointment}) {
     setState(() {
+      print("Toggling overlay visibility: $_isOverlayVisible");
       _isOverlayVisible = !_isOverlayVisible;
+      _editingAppointment = appointment; // Set the appointment being edited
     });
   }
 
@@ -161,6 +166,9 @@ class _PlanningState extends State<Planning> {
                                           onClose:
                                               () => Navigator.of(context).pop(),
                                           onDelete: _deleteAppointment,
+                                          onReload:
+                                              _fetchAppointments, // Pass the reload callback
+                                          uid: widget.uid,
                                         );
                                       },
                                     );
@@ -171,99 +179,111 @@ class _PlanningState extends State<Planning> {
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     margin: const EdgeInsets.symmetric(
-                                      vertical: 12.0,
-                                    ), // Increased margin
+                                      vertical: 8.0,
+                                    ), // Match dayappointment padding
                                     padding: const EdgeInsets.all(
-                                      16.0,
-                                    ), // Increased padding
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment
-                                              .start, // Align items at the top
+                                      12.0,
+                                    ), // Match dayappointment padding
+                                    child: Stack(
                                       children: [
-                                        // Date (day of the month)
-                                        Text(
-                                          DateFormat('d').format(
-                                            appointment['startTime'].toDate(),
-                                          ),
-                                          style: const TextStyle(
-                                            fontSize: 28, // Increased font size
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                        const SizedBox(
-                                          width: 20,
-                                        ), // Increased spacing
-                                        // Text Information
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                appointment['title'] ?? '',
-                                                style: const TextStyle(
-                                                  fontSize:
-                                                      18, // Increased font size
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.white,
-                                                ),
+                                        Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            // Day of the Month
+                                            Text(
+                                              DateFormat('d').format(
+                                                appointment['startTime']
+                                                    .toDate(),
                                               ),
-                                              const SizedBox(
-                                                height: 12,
-                                              ), // Increased spacing
-                                              Text(
-                                                '${DateFormat.Hm().format(appointment['startTime'].toDate())} - ${DateFormat.Hm().format(appointment['endTime'].toDate())}',
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 16,
-                                                ),
+                                              style: const TextStyle(
+                                                fontSize:
+                                                    16, // Match dayappointment font size
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
                                               ),
-                                              const SizedBox(
-                                                height: 12,
-                                              ), // Increased spacing
-                                              if (appointment['locationName'] !=
-                                                  null)
-                                                Text(
-                                                  appointment['locationName']!,
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 16,
-                                                  ),
-                                                ),
-                                              if (appointment['locationAddress'] !=
-                                                  null)
-                                                Padding(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                        top: 16.0,
-                                                      ), // Add spacing
-                                                  child: Text(
-                                                    appointment['locationAddress']!,
+                                            ),
+                                            const SizedBox(width: 16),
+                                            // Appointment Details
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  // Title
+                                                  Text(
+                                                    appointment['title'] ??
+                                                        'No Title',
                                                     style: const TextStyle(
+                                                      fontSize:
+                                                          16, // Match dayappointment font size
+                                                      fontWeight:
+                                                          FontWeight.bold,
                                                       color: Colors.white,
-                                                      fontSize: 16,
                                                     ),
                                                   ),
-                                                ),
-                                            ],
-                                          ),
+                                                  const SizedBox(height: 4),
+                                                  // Time
+                                                  Text(
+                                                    '${DateFormat.Hm().format(appointment['startTime'].toDate())} - ${DateFormat.Hm().format(appointment['endTime'].toDate())}',
+                                                    style: const TextStyle(
+                                                      fontSize:
+                                                          14, // Match dayappointment font size
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  // Location
+                                                  if (appointment['locationName'] !=
+                                                      null)
+                                                    Text(
+                                                      appointment['locationName']!,
+                                                      style: const TextStyle(
+                                                        fontSize:
+                                                            14, // Match dayappointment font size
+                                                        color: Colors.white,
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        // Location Button
-                                        IconButton(
-                                          alignment:
-                                              Alignment
-                                                  .topCenter, // Align icon at the top
-                                          icon: const Icon(
-                                            Icons.location_on,
-                                            color: Colors.white,
+                                        // Location Icon
+                                        if (appointment['locationName'] != null)
+                                          Positioned(
+                                            top: 0,
+                                            right: 0,
+                                            child: GestureDetector(
+                                              onTap: () {
+                                                Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder:
+                                                        (
+                                                          context,
+                                                        ) => LocationPage(
+                                                          uid: widget.uid,
+                                                          initialLocationName:
+                                                              appointment['locationName'],
+                                                          initialLatitude:
+                                                              appointment['latitude'],
+                                                          initialLongitude:
+                                                              appointment['longitude'],
+                                                          initialTransportMode:
+                                                              appointment['TravelMode'],
+                                                        ),
+                                                  ),
+                                                );
+                                              },
+                                              child: const Icon(
+                                                Icons.location_on,
+                                                color: Colors.white,
+                                                size:
+                                                    24, // Match dayappointment icon size
+                                              ),
+                                            ),
                                           ),
-                                          onPressed: () {
-                                            // Open Google Maps or handle location
-                                            print('Navigeren naar locatie');
-                                          },
-                                        ),
                                       ],
                                     ),
                                   ),
@@ -278,7 +298,7 @@ class _PlanningState extends State<Planning> {
           floatingActionButton: FloatingActionButton(
             heroTag: 'planning_fab', // Single heroTag for all pages
             backgroundColor: const Color(0xFF003049),
-            onPressed: _toggleOverlay,
+            onPressed: () => _toggleOverlay(),
             child: const Icon(Icons.add, color: Colors.white),
           ),
           floatingActionButtonLocation:
@@ -286,15 +306,19 @@ class _PlanningState extends State<Planning> {
           bottomNavigationBar: NavBar(
             currentIndex: 0, // Set the current index for Planning
             uid: widget.uid, // Pass the user ID
-            onFabPressed: _toggleOverlay, // Pass the FAB action
+            onFabPressed: () => _toggleOverlay(), // Pass the FAB action
           ),
         ),
         if (_isOverlayVisible)
           CreatePlanOverlay(
-            onClose: _toggleOverlay,
+            onClose:
+                _toggleOverlay, // Close the overlay when the user taps outside or presses close
             uid: widget.uid,
-            onSave:
-                _fetchAppointments, // Pass the method to refresh appointments
+            onSave: () {
+              _fetchAppointments(); // Refresh appointments after saving or updating
+            },
+            initialData:
+                _editingAppointment, // Pass the data of the appointment being edited
           ),
       ],
     );

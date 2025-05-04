@@ -1,11 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:newagendaapp/pages/planning.dart';
-import 'package:newagendaapp/pages/month.dart';
-import 'package:newagendaapp/pages/location.dart';
 import 'package:newagendaapp/overlay/createplan.dart';
 import 'package:newagendaapp/service/firebaseServices.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:newagendaapp/pages/auth/login.dart';
 import 'package:newagendaapp/widigits/nav.dart';
 
@@ -151,7 +148,18 @@ class _AccountState extends State<Account> {
           ),
         ),
         if (_isOverlayVisible)
-          CreatePlanOverlay(onClose: _toggleOverlay, uid: widget.uid),
+          CreatePlanOverlay(
+            onClose: _toggleOverlay,
+            uid: widget.uid,
+            onSave: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => Planning(uid: widget.uid),
+                ),
+              ); //
+            },
+          ),
       ],
     );
   }
