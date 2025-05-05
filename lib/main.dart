@@ -462,7 +462,7 @@ class _MyAppState extends State<MyApp> {
     try {
       print("Fetching shared appointments...");
       String userId = FirebaseAuth.instance.currentUser!.uid;
-
+      print("User ID: $userId");
       // Fetch shared appointments
       QuerySnapshot sharedAppointmentsSnapshot =
           await FirebaseFirestore.instance
@@ -471,11 +471,12 @@ class _MyAppState extends State<MyApp> {
               .collection('shared')
               .get();
 
+      print(
+        'Fetched shared appointments: ${sharedAppointmentsSnapshot.docs.length}',
+      );
       for (var creatorDoc in sharedAppointmentsSnapshot.docs) {
         QuerySnapshot appointmentsSnapshot =
-            await creatorDoc.reference
-                .collection('appointments')
-                .get(); // Fetch all appointments
+            await creatorDoc.reference.collection('appointments').get();
 
         print(
           'Fetched shared appointments: ${appointmentsSnapshot.docs.length}',
