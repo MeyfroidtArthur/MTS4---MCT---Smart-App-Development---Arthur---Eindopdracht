@@ -269,6 +269,104 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
+  /// Sends a 1-day reminder notification for an appointment.
+  Future<void> _sendOneDayReminderNotification(
+    Map<String, dynamic> appointment,
+    DateTime startTime,
+  ) async {
+    String title = appointment['title'];
+    String locationName = appointment['locationName'];
+    String appointmentId =
+        appointment['id']; // Ensure each appointment has a unique ID.
+    String userId =
+        FirebaseAuth.instance.currentUser!.uid; // Get the current user's UID.
+
+    // Check if the notification has already been sent
+    DocumentSnapshot doc =
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .collection('appointments')
+            .doc(appointmentId)
+            .get();
+
+    if (!doc.exists ||
+        (doc.data() as Map<String, dynamic>)['notificationSentOneDay'] !=
+            true) {
+      if (startTime.difference(DateTime.now()).inHours < 24) {
+        await _showNotification(
+          id: appointment.hashCode,
+          title:
+              "Herinnering: $title morgen om ${DateFormat('HH:mm').format(startTime)}",
+          body:
+              'Je afspraak bij $locationName is morgen. Vergeet niet te plannen!',
+          channelId: 'reminder_channel',
+          channelName: 'Reminder Notifications',
+        );
+
+        // Update the database to mark the notification as sent
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .collection('appointments')
+            .doc(appointmentId)
+            .set({'notificationSentOneDay': true}, SetOptions(merge: true));
+      }
+    }
+  }
+
+  /// Sends a travel notification for an appointment.
+  Future<void> _sendTravelNotification(
+    Map<String, dynamic> appointment,
+    DateTime leaveTime,
+    DateTime startTime,
+  ) async {
+    String title = appointment['title'];
+    String locationName = appointment['locationName'];
+    String appointmentId =
+        appointment['id']; // Ensure each appointment has a unique ID.
+    String userId =
+        FirebaseAuth.instance.currentUser!.uid; // Get the current user's UID.
+
+    // Check if the notification has already been sent
+    DocumentSnapshot doc =
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .collection('appointments')
+            .doc(appointmentId)
+            .get();
+
+    if (!doc.exists ||
+        (doc.data() as Map<String, dynamic>)['notificationSentTravel'] !=
+            true) {
+      if (leaveTime.difference(DateTime.now()).inMinutes.abs() <= 1) {
+        await _showNotification(
+          id: appointment.hashCode + 1,
+          title: "Afspraak $title om ${DateFormat('HH:mm').format(startTime)}",
+          body:
+              'Je moet nu vertrekken om $locationName te bereiken voor je afspraak.',
+          channelId: 'test_channel',
+          channelName: 'Test Notifications',
+          payload: jsonEncode({
+            'TravelMode': appointment['TravelMode'],
+            'latitude': appointment['latitude'],
+            'longitude': appointment['longitude'],
+            'locationName': locationName,
+          }),
+        );
+
+        // Update the database to mark the notification as sent
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .collection('appointments')
+            .doc(appointmentId)
+            .set({'notificationSentTravel': true}, SetOptions(merge: true));
+      }
+    }
+  }
+
   /// Processes appointments and sends notifications.
   void _processAppointments(List<Map<String, dynamic>> appointments) async {
     for (var appointment in appointments) {
@@ -287,57 +385,12 @@ class _MyAppState extends State<MyApp> {
       );
       appointment['leaveTime'] = leaveTime;
 
-      _sendNotifications(appointment, leaveTime, startTime);
+      // Send separate notifications
+      await _sendOneDayReminderNotification(appointment, startTime);
+      await _sendTravelNotification(appointment, leaveTime, startTime);
     }
     _previousAppointments = appointments;
   }
-
-  /// Sends notifications for appointments.
-  void _sendNotifications(
-    Map<String, dynamic> appointment,
-    DateTime leaveTime,
-    DateTime startTime,
-  ) async {
-    String title = appointment['title'];
-    String locationName = appointment['locationName'];
-
-    // 1-day reminder notification
-    if (!_notifiedOneDayAppointments.contains(title) &&
-        startTime.difference(DateTime.now()).inHours < 24) {
-      await _showNotification(
-        id: appointment.hashCode,
-        title:
-            "Herinnering: $title morgen om ${DateFormat('HH:mm').format(startTime)}",
-        body:
-            'Je afspraak bij $locationName is morgen. Vergeet niet te plannen!',
-        channelId: 'reminder_channel',
-        channelName: 'Reminder Notifications',
-      );
-      _notifiedOneDayAppointments.add(title);
-    }
-
-    // Immediate notification for leaving
-    if (!_notifiedAppointments.contains(title) &&
-        leaveTime.difference(DateTime.now()).inMinutes.abs() <= 1) {
-      await _showNotification(
-        id: appointment.hashCode + 1,
-        title: "Afspraak $title om ${DateFormat('HH:mm').format(startTime)}",
-        body:
-            'Je moet nu vertrekken om $locationName te bereiken voor je afspraak.',
-        channelId: 'test_channel',
-        channelName: 'Test Notifications',
-        payload: jsonEncode({
-          'TravelMode': appointment['TravelMode'],
-          'latitude': appointment['latitude'],
-          'longitude': appointment['longitude'],
-          'locationName': locationName,
-        }),
-      );
-      _notifiedAppointments.add(title);
-    }
-  }
-
-  /// Shows a notification.
 
   /// Requests notification permissions with fallback.
   Future<void> _requestNotificationPermissions() async {
