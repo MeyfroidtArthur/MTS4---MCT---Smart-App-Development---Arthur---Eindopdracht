@@ -27,3 +27,7 @@ Mijn idee is een agenda-app met de volgende functies:
 3. Afspraken verder dan 1 jaar vooruit
 4. Vorige maanden bekijken
 5. Connectie met Google Agenda, Outlook, ...
+
+## Invite Link
+
+https://appdistribution.firebase.dev/i/6988824593a65895
