@@ -5,6 +5,7 @@ import 'package:newagendaapp/overlay/createplan.dart';
 import 'package:intl/intl.dart'; // Import for date formatting
 import 'package:newagendaapp/widigits/nav.dart'; // Import NavBar
 import 'package:newagendaapp/widigits/appointment_info_overlay.dart';
+import 'package:newagendaapp/service/dotnet_communication.dart'; // Import sendOnMyWayNotification
 
 class Planning extends StatefulWidget {
   final String uid;
@@ -145,14 +146,18 @@ class _PlanningState extends State<Planning> {
                               ),
                               // Appointments for the Month
                               ...monthAppointments.map((appointment) {
-                                final backgroundColor = Color(
-                                  int.parse(
-                                    appointment['Color'].replaceFirst(
-                                      '#',
-                                      '0xFF',
-                                    ),
-                                  ), // Convert hex string to Color
-                                );
+                                final backgroundColor =
+                                    appointment['Color'] != null
+                                        ? Color(
+                                          int.parse(
+                                            appointment['Color']!.replaceFirst(
+                                              '#',
+                                              '0xFF',
+                                            ),
+                                          ), // Convert hex string to Color
+                                        )
+                                        : Colors
+                                            .grey; // Default color if 'Color' is null
 
                                 return GestureDetector(
                                   onTap: () {
@@ -256,7 +261,32 @@ class _PlanningState extends State<Planning> {
                                             top: 0,
                                             right: 0,
                                             child: GestureDetector(
-                                              onTap: () {
+                                              onTap: () async {
+                                                final List<dynamic>?
+                                                participants =
+                                                    appointment['participants'];
+                                                if (participants != null &&
+                                                    participants.isNotEmpty) {
+                                                  final String fcmToken =
+                                                      participants[0]['fcmToken'] ??
+                                                      '';
+                                                  print('FCM Token: $fcmToken');
+                                                  // Example: Sending a notification to the first participant
+                                                  if (fcmToken.isNotEmpty) {
+                                                    await sendOnMyWayNotification(
+                                                      apiUrl:
+                                                          'http://192.168.129.59:5000/Notify',
+                                                      fcmToken: fcmToken,
+                                                      title: "I'm on my way!",
+                                                      body:
+                                                          "Your friend is coming!",
+                                                    );
+                                                  }
+                                                } else {
+                                                  print(
+                                                    'No participants found or participants list is empty.',
+                                                  );
+                                                }
                                                 Navigator.push(
                                                   context,
                                                   MaterialPageRoute(

@@ -17,6 +17,14 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'firebase_options.dart';
 import 'pages/planning.dart';
 import 'pages/auth/login.dart';
+import 'dart:async';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz;
+import 'service/firebaseServices.dart';
+import 'package:location/location.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'pages/location.dart';
 import 'service/firebaseServices.dart';
 import 'config.dart';
@@ -29,6 +37,10 @@ void main() async {
   MapboxOptions.setAccessToken(Config.mapboxAccessToken);
 
   runApp(const MyApp());
+}
+
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  print("Handling a background message: ${message.messageId}");
 }
 
 class MyApp extends StatefulWidget {
@@ -50,6 +62,8 @@ class _MyAppState extends State<MyApp> {
   Set<String> _notifiedOneDayAppointments = {};
   double _currentLatitude = 0.0;
   double _currentLongitude = 0.0;
+  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  Set<String> _notifiedAppointments = {}; // Track notified appointments
 
   @override
   void initState() {
@@ -59,6 +73,7 @@ class _MyAppState extends State<MyApp> {
     _initializeNotifications();
     _requestNotificationPermissions();
     _startAppointmentFetchTimer();
+    _setupFirebaseMessaging();
   }
 
   @override
@@ -68,6 +83,79 @@ class _MyAppState extends State<MyApp> {
   }
 
   /// Starts a periodic timer to fetch upcoming appointments.
+  void _setupFirebaseMessaging() async {
+    NotificationSettings settings = await FirebaseMessaging.instance
+        .requestPermission(alert: true, badge: true, sound: true);
+
+    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      print('User granted permission');
+    } else if (settings.authorizationStatus ==
+        AuthorizationStatus.provisional) {
+      print('User granted provisional permission');
+    } else {
+      print('User declined or has not accepted permission');
+    }
+
+    String? fcmToken = await FirebaseMessaging.instance.getToken();
+    if (fcmToken != null) {
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('public_users')
+            .doc(user.uid)
+            .set({'fcmToken': fcmToken}, SetOptions(merge: true));
+        print('FCM Token saved: $fcmToken');
+      }
+    }
+
+    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('public_users')
+            .doc(user.uid)
+            .set({'fcmToken': newToken}, SetOptions(merge: true));
+        print('FCM Token updated: $newToken');
+      }
+    });
+
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      print(
+        'Received a message in the foreground: ${message.notification?.title}',
+      );
+      if (message.notification != null) {
+        _showNotification(
+          message.notification!.title ?? 'No Title',
+          message.notification!.body ?? 'No Body',
+        );
+      }
+    });
+
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      print(
+        'Notification clicked and app opened: ${message.notification?.title}',
+      );
+    });
+  }
+
+  Future<void> _showNotification(String title, String body) async {
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          'default_channel',
+          'Default Notifications',
+          channelDescription: 'Channel for default notifications',
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
+        );
+
+    const NotificationDetails platformDetails = NotificationDetails(
+      android: androidDetails,
+    );
+
+    await flutterLocalNotificationsPlugin.show(0, title, body, platformDetails);
+  }
+
   void _startAppointmentFetchTimer() {
     _appointmentFetchTimer = Timer.periodic(
       const Duration(minutes: 1),
@@ -100,24 +188,25 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
-  /// Updates the current location of the user.
-  Future<void> _updateCurrentLocation() async {
-    Location location = Location();
+        // Calculate travel time using the _getRoute method
+        double travelTime = await _calculateTravelTime(
+          _currentLatitude,
+          _currentLongitude,
+          appointment['latitude'],
+          appointment['longitude'],
+          appointment['TravelMode'],
+        );
 
-    if (!await location.serviceEnabled() && !await location.requestService()) {
-      print("Location services are disabled.");
-      _currentLatitude = 0.0;
-      _currentLongitude = 0.0;
-      return;
-    }
+        // Add 30 minutes to the travel time
+        travelTime += 30;
 
-    if (await location.hasPermission() == PermissionStatus.denied &&
-        await location.requestPermission() != PermissionStatus.granted) {
-      print("Location permissions are denied.");
-      _currentLatitude = 0.0;
-      _currentLongitude = 0.0;
-      return;
-    }
+        // Calculate when to leave
+        DateTime startTime = (appointment['startTime'] as Timestamp).toDate();
+        DateTime leaveTime = startTime.subtract(
+          Duration(minutes: travelTime.toInt()),
+        );
+        appointment['leaveTime'] = leaveTime;
+        print("You need to leave at: ${appointment['leaveTime'].toLocal()}");
 
     LocationData locationData = await location.getLocation();
     _currentLatitude = locationData.latitude ?? 0.0;
@@ -255,7 +344,6 @@ class _MyAppState extends State<MyApp> {
       },
       body: body,
     );
-
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       return data['features'][0]['properties']['segments'][0]['duration'] / 60;
@@ -338,7 +426,8 @@ class _MyAppState extends State<MyApp> {
         future: _initialPage,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
-            return snapshot.data!;
+            Widget homePage = snapshot.data!;
+            return homePage;
           } else {
             return const Center(child: CircularProgressIndicator());
           }
