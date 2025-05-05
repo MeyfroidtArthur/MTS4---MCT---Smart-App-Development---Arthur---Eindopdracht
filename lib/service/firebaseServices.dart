@@ -90,39 +90,60 @@ class FirestoreAccess {
   }
 
   Future<void> CreateAppointment(
-    String uid,
+    String creatorUid,
     String title,
     String description,
-    DateTime startTime,
-    DateTime endTime,
-    String locationName,
-    double latitude,
-    double longitude,
-    String travelMode,
+    DateTime startDateTime,
+    DateTime endDateTime,
+    String destinationName,
+    double destinationLatitude,
+    double destinationLongitude,
+    String transportMode,
     String color,
-    List<Map<String, dynamic>> participants, // Add participants parameter
+    List<Map<String, dynamic>> participants,
   ) async {
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('appointments')
-        .add({
-          'uid': uid,
-          'title': title,
-          'description': description,
-          'startTime': Timestamp.fromDate(
-            startTime,
-          ), // Convert to Firestore timestamp
-          'endTime': Timestamp.fromDate(
-            endTime,
-          ), // Convert to Firestore timestamp
-          'locationName': locationName,
-          'latitude': latitude,
-          'longitude': longitude,
-          'TravelMode': travelMode,
-          'Color': color,
-          'participants': participants, // Save participants to Firestore
-        });
+    final appointmentRef =
+        FirebaseFirestore.instance
+            .collection('users')
+            .doc(creatorUid)
+            .collection('appointments')
+            .doc();
+
+    final appointmentData = {
+      'uid': appointmentRef.id,
+      'title': title,
+      'description': description,
+      'startTime': startDateTime,
+      'endTime': endDateTime,
+      'locationName': destinationName,
+      'latitude': destinationLatitude,
+      'longitude': destinationLongitude,
+      'TravelMode': transportMode,
+      'Color': color,
+      'creatorUid': creatorUid,
+      'participants': participants,
+    };
+
+    // Save the appointment in the creator's collection
+    await appointmentRef.set(appointmentData);
+
+    // Add the appointment to each participant's shared collection
+    for (final participant in participants) {
+      final participantUid = participant['id'];
+      print('Participant UID: $participantUid');
+      final sharedRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(participantUid) // The participant's UID
+          .collection('shared')
+          .doc(creatorUid) // The creator's UID
+          .collection('appointments') // Nested collection for appointments
+          .doc(appointmentRef.id); // The appointment ID
+
+      await sharedRef.set({
+        ...appointmentData,
+        'sharedBy': creatorUid, // Indicate who shared the appointment
+      });
+    }
   }
 
   Future<List<Map<String, dynamic>>> getAppointments(String userId) async {
@@ -160,40 +181,56 @@ class FirestoreAccess {
   }
 
   Future<void> UpdateAppointment(
-    String uid,
+    String creatorUid,
     String appointmentId,
     String title,
     String description,
-    DateTime startTime,
-    DateTime endTime,
-    String locationName,
-    double latitude,
-    double longitude,
-    String travelMode,
+    DateTime startDateTime,
+    DateTime endDateTime,
+    String destinationName,
+    double destinationLatitude,
+    double destinationLongitude,
+    String transportMode,
     String color,
-    List<Map<String, dynamic>> participants, // Add participants parameter
+    List<Map<String, dynamic>> participants,
   ) async {
-    await FirebaseFirestore.instance
+    final appointmentRef = FirebaseFirestore.instance
         .collection('users')
-        .doc(uid)
+        .doc(creatorUid)
         .collection('appointments')
-        .doc(appointmentId)
-        .update({
-          'uid': uid,
-          'title': title,
-          'description': description,
-          'startTime': Timestamp.fromDate(
-            startTime,
-          ), // Convert to Firestore timestamp
-          'endTime': Timestamp.fromDate(
-            endTime,
-          ), // Convert to Firestore timestamp
-          'locationName': locationName,
-          'latitude': latitude,
-          'longitude': longitude,
-          'TravelMode': travelMode,
-          'Color': color,
-          'participants': participants, // Update participants in Firestore
-        });
+        .doc(appointmentId);
+
+    final appointmentData = {
+      'uid': appointmentRef.id,
+      'title': title,
+      'description': description,
+      'startTime': startDateTime,
+      'endTime': endDateTime,
+      'locationName': destinationName,
+      'latitude': destinationLatitude,
+      'longitude': destinationLongitude,
+      'TravelMode': transportMode,
+      'Color': color,
+      'creatorUid': creatorUid,
+      'participants': participants,
+    };
+
+    // Update the appointment
+    await appointmentRef.set(appointmentData, SetOptions(merge: true));
+
+    // Update the appointment in each participant's shared collection
+    for (final participant in participants) {
+      final participantUid = participant['uid'];
+      final sharedRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(participantUid)
+          .collection('shared')
+          .doc(appointmentId);
+
+      await sharedRef.set({
+        ...appointmentData,
+        'sharedBy': creatorUid, // Indicate who shared the appointment
+      });
+    }
   }
 }

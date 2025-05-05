@@ -6,6 +6,7 @@ import 'package:intl/intl.dart'; // Import for date formatting
 import 'package:newagendaapp/widigits/nav.dart'; // Import NavBar
 import 'package:newagendaapp/widigits/appointment_info_overlay.dart';
 import 'package:newagendaapp/service/dotnet_communication.dart'; // Import sendOnMyWayNotification
+import 'package:cloud_firestore/cloud_firestore.dart'; // Import FirebaseFirestore
 
 class Planning extends StatefulWidget {
   final String uid;
@@ -267,15 +268,53 @@ class _PlanningState extends State<Planning> {
                                                     appointment['participants'];
                                                 if (participants != null &&
                                                     participants.isNotEmpty) {
-                                                  final String fcmToken =
-                                                      participants[0]['fcmToken'] ??
-                                                      '';
-                                                  print('FCM Token: $fcmToken');
+                                                  final String participantUid =
+                                                      participants[0]['id']; // Get the participant's UID
+                                                  final String creatorUid =
+                                                      appointment['creatorUid']; // Get the creator's UID
+                                                  final String appointmentId =
+                                                      appointment['uid']; // Get the appointment ID
+                                                  print(participantUid);
+                                                  try {
+                                                    // Add the vertrokken field to the shared appointment
+                                                    await FirebaseFirestore
+                                                        .instance
+                                                        .collection('users')
+                                                        .doc(
+                                                          participantUid,
+                                                        ) // The participant's UID
+                                                        .collection('shared')
+                                                        .doc(
+                                                          creatorUid,
+                                                        ) // The creator's UID
+                                                        .collection(
+                                                          'appointments',
+                                                        )
+                                                        .doc(
+                                                          appointmentId,
+                                                        ) // The appointment ID
+                                                        .set(
+                                                          {'vertrokken': true},
+                                                          SetOptions(
+                                                            merge: true,
+                                                          ),
+                                                        );
+
+                                                    print(
+                                                      'Shared appointment updated with vertrokken: true',
+                                                    );
+                                                  } catch (e) {
+                                                    print(
+                                                      'Failed to add vertrokken to shared appointment: $e',
+                                                    );
+                                                  }
                                                 } else {
                                                   print(
                                                     'No participants found or participants list is empty.',
                                                   );
                                                 }
+
+                                                // Navigate to the LocationPage
                                                 Navigator.push(
                                                   context,
                                                   MaterialPageRoute(

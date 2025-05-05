@@ -170,10 +170,10 @@ class _MyAppState extends State<MyApp> {
   }
 
   void _startAppointmentFetchTimer() {
-    _appointmentFetchTimer = Timer.periodic(
-      const Duration(minutes: 1),
-      (_) => _fetchUpcomingAppointments(),
-    );
+    _appointmentFetchTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      _fetchUpcomingAppointments();
+      _fetchSharedAppointments(); // Check shared appointments
+    });
   }
 
   /// Updates the current location of the user.
@@ -455,6 +455,61 @@ class _MyAppState extends State<MyApp> {
   Future<Widget> _getInitialPage() async {
     User? user = FirebaseAuth.instance.currentUser;
     return user != null ? Planning(uid: user.uid) : LoginPage();
+  }
+
+  /// Fetches shared appointments and handles notifications.
+  Future<void> _fetchSharedAppointments() async {
+    try {
+      print("Fetching shared appointments...");
+      String userId = FirebaseAuth.instance.currentUser!.uid;
+
+      // Fetch shared appointments
+      QuerySnapshot sharedAppointmentsSnapshot =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userId)
+              .collection('shared')
+              .get();
+
+      for (var creatorDoc in sharedAppointmentsSnapshot.docs) {
+        QuerySnapshot appointmentsSnapshot =
+            await creatorDoc.reference
+                .collection('appointments')
+                .get(); // Fetch all appointments
+
+        print(
+          'Fetched shared appointments: ${appointmentsSnapshot.docs.length}',
+        );
+
+        for (var appointmentDoc in appointmentsSnapshot.docs) {
+          Map<String, dynamic> appointmentData =
+              appointmentDoc.data() as Map<String, dynamic>;
+
+          // Check if 'vertrokken' exists and is true
+          if (appointmentData['vertrokken'] == true) {
+            // Check if notificationFriend is already sent
+            if (appointmentData['notificationFriend'] != true) {
+              // Send notification
+              await _showNotification(
+                id: appointmentDoc.hashCode,
+                title: "Je vriend is vertrokken!",
+                body:
+                    "Je vriend is vertrokken naar ${appointmentData['locationName']}.",
+                channelId: 'friend_channel',
+                channelName: 'Friend Notifications',
+              );
+
+              // Update Firestore to mark notification as sent
+              await appointmentDoc.reference.set({
+                'notificationFriend': true,
+              }, SetOptions(merge: true));
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print("Error fetching shared appointments: $e");
+    }
   }
 
   @override

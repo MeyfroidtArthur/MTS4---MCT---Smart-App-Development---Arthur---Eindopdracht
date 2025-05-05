@@ -44,7 +44,7 @@ class _UserSelectionModalState extends State<UserSelectionModal> {
             continue; // Skip the current user's document
           }
           fetchedUsers.add({
-            'id': doc.id, // Use the document ID as the user ID
+            'id': doc['userId'], // Use the document ID as the user ID
             'name': doc['name'],
             'fcmToken': doc['fcmToken'],
           });
