@@ -271,17 +271,6 @@ class _PlanningState extends State<Planning> {
                                                       participants[0]['fcmToken'] ??
                                                       '';
                                                   print('FCM Token: $fcmToken');
-                                                  // Example: Sending a notification to the first participant
-                                                  if (fcmToken.isNotEmpty) {
-                                                    await sendOnMyWayNotification(
-                                                      apiUrl:
-                                                          'http://192.168.129.59:5000/Notify',
-                                                      fcmToken: fcmToken,
-                                                      title: "I'm on my way!",
-                                                      body:
-                                                          "Your friend is coming!",
-                                                    );
-                                                  }
                                                 } else {
                                                   print(
                                                     'No participants found or participants list is empty.',

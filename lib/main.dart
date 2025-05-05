@@ -117,8 +117,11 @@ class _MyAppState extends State<MyApp> {
       );
       if (message.notification != null) {
         _showNotification(
-          message.notification!.title ?? 'No Title',
-          message.notification!.body ?? 'No Body',
+          id: message.hashCode,
+          title: message.notification!.title ?? 'No Title',
+          body: message.notification!.body ?? 'No Body',
+          channelId: 'test_channel',
+          channelName: 'Test Notifications',
         );
       }
     });
@@ -130,22 +133,40 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
-  Future<void> _showNotification(String title, String body) async {
+  Future<void> _showNotification({
+    required int id,
+    required String title,
+    required String body,
+    required String channelId,
+    required String channelName,
+    String? payload,
+  }) async {
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
-          'default_channel',
-          'Default Notifications',
-          channelDescription: 'Channel for default notifications',
+          'test_channel',
+          'Test Notifications',
+          channelDescription: 'Kanaal voor testmeldingen',
           importance: Importance.max,
           priority: Priority.high,
           playSound: true,
+          enableVibration: true,
         );
 
     const NotificationDetails platformDetails = NotificationDetails(
       android: androidDetails,
     );
 
-    await _notificationsPlugin.show(0, title, body, platformDetails);
+    try {
+      await _notificationsPlugin.show(
+        id,
+        title,
+        body,
+        platformDetails,
+        payload: payload,
+      );
+    } catch (e) {
+      print("Error showing notification: $e");
+    }
   }
 
   void _startAppointmentFetchTimer() {
