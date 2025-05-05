@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:newagendaapp/config.dart';
 import 'package:newagendaapp/overlay/createplan.dart';
 import 'package:newagendaapp/pages/planning.dart';
+import 'package:newagendaapp/widigits/RemainingInfoWidget.dart';
 import 'package:newagendaapp/widigits/nav.dart';
 import 'package:location/location.dart';
 import 'package:http/http.dart' as http;
@@ -216,8 +218,7 @@ class _LocationState extends State<LocationPage> {
     final response = await http.post(
       Uri.parse(url),
       headers: {
-        'Authorization':
-            '5b3ce3597851110001cf6248df8b8f5c778e4284921481a807469217',
+        'Authorization': Config.openRouteServiceApiKey,
         'Content-Type': 'application/json',
       },
       body: body,
@@ -377,43 +378,9 @@ class _LocationState extends State<LocationPage> {
                       bottom: 45,
                       left: 16,
                       right: 16,
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF003049).withOpacity(0.7),
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black26,
-                              blurRadius: 6,
-                              offset: Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              '${_remainingTime.toStringAsFixed(1)} min',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              '${_remainingDistance.toStringAsFixed(2)} km',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
+                      child: RemainingInfoWidget(
+                        remainingTime: _remainingTime,
+                        remainingDistance: _remainingDistance,
                       ),
                     ),
                     Positioned(

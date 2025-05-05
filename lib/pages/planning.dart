@@ -106,7 +106,7 @@ class _PlanningState extends State<Planning> {
             ), // Add 16 padding left and right
             child: Padding(
               padding: const EdgeInsets.only(
-                top: 16.0,
+                top: 24.0,
               ), // Add 16 padding at the top
               child:
                   _appointments.isEmpty
@@ -133,7 +133,8 @@ class _PlanningState extends State<Planning> {
                                   child: Text(
                                     monthKey,
                                     style: const TextStyle(
-                                      fontSize: 20,
+                                      fontSize:
+                                          24, // Match the Month page text size
                                       fontWeight: FontWeight.bold,
                                       color:
                                           Colors
