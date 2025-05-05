@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -11,21 +12,13 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:location/location.dart';
+import 'package:newagendaapp/pages/location.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 
 import 'firebase_options.dart';
 import 'pages/planning.dart';
 import 'pages/auth/login.dart';
-import 'dart:async';
-import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest.dart' as tz;
-import 'service/firebaseServices.dart';
-import 'package:location/location.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'pages/location.dart';
 import 'service/firebaseServices.dart';
 import 'config.dart';
 
@@ -63,7 +56,6 @@ class _MyAppState extends State<MyApp> {
   double _currentLatitude = 0.0;
   double _currentLongitude = 0.0;
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-  Set<String> _notifiedAppointments = {}; // Track notified appointments
 
   @override
   void initState() {
@@ -153,7 +145,7 @@ class _MyAppState extends State<MyApp> {
       android: androidDetails,
     );
 
-    await flutterLocalNotificationsPlugin.show(0, title, body, platformDetails);
+    await _notificationsPlugin.show(0, title, body, platformDetails);
   }
 
   void _startAppointmentFetchTimer() {
@@ -161,6 +153,32 @@ class _MyAppState extends State<MyApp> {
       const Duration(minutes: 1),
       (_) => _fetchUpcomingAppointments(),
     );
+  }
+
+  /// Updates the current location of the user.
+  Future<void> _updateCurrentLocation() async {
+    try {
+      Location location = Location();
+      bool serviceEnabled = await location.serviceEnabled();
+      if (!serviceEnabled) {
+        serviceEnabled = await location.requestService();
+        if (!serviceEnabled) return;
+      }
+
+      PermissionStatus permissionGranted = await location.hasPermission();
+      if (permissionGranted == PermissionStatus.denied) {
+        permissionGranted = await location.requestPermission();
+        if (permissionGranted != PermissionStatus.granted) return;
+      }
+
+      LocationData locationData = await location.getLocation();
+      setState(() {
+        _currentLatitude = locationData.latitude ?? 0.0;
+        _currentLongitude = locationData.longitude ?? 0.0;
+      });
+    } catch (e) {
+      print("Error updating location: $e");
+    }
   }
 
   /// Fetches upcoming appointments and handles notifications.
@@ -188,29 +206,46 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
-        // Calculate travel time using the _getRoute method
-        double travelTime = await _calculateTravelTime(
-          _currentLatitude,
-          _currentLongitude,
-          appointment['latitude'],
-          appointment['longitude'],
-          appointment['TravelMode'],
-        );
+  /// Calculates travel time using OpenRouteService API.
+  Future<double> _calculateTravelTime(
+    double startLat,
+    double startLon,
+    double endLat,
+    double endLon,
+    String travelMode,
+  ) async {
+    final String url =
+        'https://api.openrouteservice.org/v2/directions/$travelMode/geojson';
 
-        // Add 30 minutes to the travel time
-        travelTime += 30;
+    final body = jsonEncode({
+      "coordinates": [
+        [startLon, startLat],
+        [endLon, endLat],
+      ],
+    });
 
-        // Calculate when to leave
-        DateTime startTime = (appointment['startTime'] as Timestamp).toDate();
-        DateTime leaveTime = startTime.subtract(
-          Duration(minutes: travelTime.toInt()),
-        );
-        appointment['leaveTime'] = leaveTime;
-        print("You need to leave at: ${appointment['leaveTime'].toLocal()}");
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Authorization': Config.openRouteServiceApiKey,
+          'Content-Type': 'application/json',
+        },
+        body: body,
+      );
 
-    LocationData locationData = await location.getLocation();
-    _currentLatitude = locationData.latitude ?? 0.0;
-    _currentLongitude = locationData.longitude ?? 0.0;
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['features'][0]['properties']['segments'][0]['duration'] /
+            60;
+      } else {
+        print("Error fetching route: ${response.statusCode}");
+        return 0.0; // Fallback travel time
+      }
+    } catch (e) {
+      print("Error calculating travel time: $e");
+      return 0.0; // Fallback travel time
+    }
   }
 
   /// Processes appointments and sends notifications.
@@ -282,74 +317,30 @@ class _MyAppState extends State<MyApp> {
   }
 
   /// Shows a notification.
-  Future<void> _showNotification({
-    required int id,
-    required String title,
-    required String body,
-    required String channelId,
-    required String channelName,
-    String? payload,
-  }) async {
-    const AndroidNotificationDetails androidDetails =
-        AndroidNotificationDetails(
-          'test_channel',
-          'Test Notifications',
-          channelDescription: 'Kanaal voor testmeldingen',
-          importance: Importance.max,
-          priority: Priority.high,
-          playSound: true,
-          enableVibration: true,
-        );
 
-    const NotificationDetails platformDetails = NotificationDetails(
-      android: androidDetails,
-    );
-
+  /// Requests notification permissions with fallback.
+  Future<void> _requestNotificationPermissions() async {
     try {
-      await _notificationsPlugin.show(
-        id,
-        title,
-        body,
-        platformDetails,
-        payload: payload,
-      );
+      if (Platform.isAndroid) {
+        final androidImplementation =
+            _notificationsPlugin
+                .resolvePlatformSpecificImplementation<
+                  AndroidFlutterLocalNotificationsPlugin
+                >();
+      } else if (Platform.isIOS) {
+        final iosImplementation =
+            _notificationsPlugin
+                .resolvePlatformSpecificImplementation<
+                  IOSFlutterLocalNotificationsPlugin
+                >();
+        await iosImplementation?.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      }
     } catch (e) {
-      print("Error showing notification: $e");
-    }
-  }
-
-  /// Calculates travel time using OpenRouteService API.
-  Future<double> _calculateTravelTime(
-    double startLat,
-    double startLon,
-    double endLat,
-    double endLon,
-    String travelMode,
-  ) async {
-    final String url =
-        'https://api.openrouteservice.org/v2/directions/$travelMode/geojson';
-
-    final body = jsonEncode({
-      "coordinates": [
-        [startLon, startLat],
-        [endLon, endLat],
-      ],
-    });
-
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {
-        'Authorization': Config.openRouteServiceApiKey,
-        'Content-Type': 'application/json',
-      },
-      body: body,
-    );
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data['features'][0]['properties']['segments'][0]['duration'] / 60;
-    } else {
-      print("Error fetching route: ${response.statusCode}");
-      return 0.0;
+      print("Error requesting notification permissions: $e");
     }
   }
 
@@ -384,29 +375,6 @@ class _MyAppState extends State<MyApp> {
         }
       },
     );
-  }
-
-  /// Requests notification permissions.
-  Future<void> _requestNotificationPermissions() async {
-    if (Platform.isAndroid) {
-      final androidImplementation =
-          _notificationsPlugin
-              .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin
-              >();
-      await androidImplementation?.requestNotificationsPermission();
-    } else if (Platform.isIOS) {
-      final iosImplementation =
-          _notificationsPlugin
-              .resolvePlatformSpecificImplementation<
-                IOSFlutterLocalNotificationsPlugin
-              >();
-      await iosImplementation?.requestPermissions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-    }
   }
 
   /// Determines the initial page based on user authentication.
