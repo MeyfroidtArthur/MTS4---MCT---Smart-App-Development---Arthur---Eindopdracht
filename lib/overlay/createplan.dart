@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:newagendaapp/widigits/autocomplete.dart';
-import 'package:newagendaapp/service/firebaseServices.dart'; // Import FirestoreAccess
+import 'package:newagendaapp/service/firebaseServices.dart';
+import 'package:newagendaapp/widigits/select_user.dart'; // Import FirestoreAccess
 
 class CreatePlanOverlay extends StatefulWidget {
   final VoidCallback onClose;
@@ -32,6 +33,7 @@ class _CreatePlanOverlayState extends State<CreatePlanOverlay> {
   DateTime endDateTime = DateTime.now().add(Duration(hours: 1));
   String selectedTransport = 'car';
   Color selectedColor = Colors.blue;
+  List<Map<String, dynamic>> participants = [];
 
   @override
   void initState() {
@@ -149,6 +151,25 @@ class _CreatePlanOverlayState extends State<CreatePlanOverlay> {
     );
   }
 
+  void _showUserSelectionModal() async {
+    final List<Map<String, dynamic>>? selectedUsers =
+        await showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          builder: (context) {
+            return UserSelectionModal(
+              uid: widget.uid,
+              onUserSelected: (users) {
+                setState(() {
+                  participants = users; // Store selected users
+                });
+              },
+              initiallySelectedUsers: participants,
+            );
+          },
+        );
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat("d MMM");
@@ -211,6 +232,7 @@ class _CreatePlanOverlayState extends State<CreatePlanOverlay> {
                                   destinationLongitude!,
                                   selectedTransport,
                                   '#${selectedColor.value.toRadixString(16).padLeft(8, '0').toUpperCase()}',
+                                  participants, // Include participants in the update
                                 );
                               } else {
                                 // Create a new appointment
@@ -225,6 +247,7 @@ class _CreatePlanOverlayState extends State<CreatePlanOverlay> {
                                   destinationLongitude!,
                                   selectedTransport,
                                   '#${selectedColor.value.toRadixString(16).padLeft(8, '0').toUpperCase()}',
+                                  participants, // Include participants in the creation
                                 );
                               }
 
@@ -341,23 +364,32 @@ class _CreatePlanOverlayState extends State<CreatePlanOverlay> {
                     ),
                     SizedBox(height: 24),
 
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text('Deelnemers'),
-                    ),
-                    SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: ElevatedButton(
-                        onPressed: () {},
-                        child: Text('Add +'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey[300],
-                          foregroundColor: Colors.black,
-                          shape: StadiumBorder(),
-                          padding: EdgeInsets.symmetric(horizontal: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text('Deelnemers'),
                         ),
-                      ),
+                        SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: ElevatedButton(
+                            onPressed: _showUserSelectionModal,
+                            child: Text('Add +'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.grey[300],
+                              foregroundColor: Colors.black,
+                              shape: StadiumBorder(),
+                              padding: EdgeInsets.symmetric(horizontal: 12),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        ...participants
+                            .map((user) => Text(user['name']))
+                            .toList(),
+                      ],
                     ),
                     SizedBox(height: 24),
 

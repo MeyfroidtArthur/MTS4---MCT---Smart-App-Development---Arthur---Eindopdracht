@@ -1,8 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:newagendaapp/pages/auth/Register.dart';
 import 'package:newagendaapp/pages/auth/vergeten.dart';
 import 'package:newagendaapp/service/firebaseServices.dart';
 import 'package:newagendaapp/pages/planning.dart';
+import 'package:firebase_messaging/firebase_messaging.dart'; // Add this import
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -32,6 +34,51 @@ class _LoginPageState extends State<LoginPage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Succesvol ingelogd!')));
+
+      // Generate and save the FCM token
+      try {
+        String? fcmToken = await FirebaseMessaging.instance.getToken();
+        if (fcmToken != null) {
+          // Fetch the user's name from the nested path
+          DocumentSnapshot userInfoDoc =
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(userId)
+                  .collection('userinfo')
+                  .doc('details') // Assuming 'details' is the document name
+                  .get();
+
+          String name =
+              userInfoDoc.exists
+                  ? userInfoDoc['name'] ?? 'Unknown User'
+                  : 'Unknown User';
+
+          // Check if the public_users document already exists
+          DocumentSnapshot publicUserDoc =
+              await FirebaseFirestore.instance
+                  .collection('public_users')
+                  .doc(userId)
+                  .get();
+
+          if (!publicUserDoc.exists) {
+            // Create the public_users document if it doesn't exist
+            await FirebaseFirestore.instance
+                .collection('public_users')
+                .doc(userId)
+                .set({'name': name, 'fcmToken': fcmToken, 'userId': userId});
+            print("Public user data created: $name, $fcmToken, $userId");
+          } else {
+            // Update the FCM token if the document already exists
+            await FirebaseFirestore.instance
+                .collection('public_users')
+                .doc(userId)
+                .update({'fcmToken': fcmToken});
+            print("Public user data updated with new FCM token: $fcmToken");
+          }
+        }
+      } catch (e) {
+        print("Error saving public user data: $e");
+      }
 
       // Navigate to Planning page with the userId
       Navigator.pushReplacement(

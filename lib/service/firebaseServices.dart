@@ -90,7 +90,7 @@ class FirestoreAccess {
   }
 
   Future<void> CreateAppointment(
-    String userId,
+    String uid,
     String title,
     String description,
     DateTime startTime,
@@ -98,30 +98,31 @@ class FirestoreAccess {
     String locationName,
     double latitude,
     double longitude,
-    String TravelMode,
-    String Color,
+    String travelMode,
+    String color,
+    List<Map<String, dynamic>> participants, // Add participants parameter
   ) async {
-    try {
-      await firestore
-          .collection('users')
-          .doc(userId)
-          .collection('appointments')
-          .add({
-            'title': title,
-            'description': description,
-            'startTime': startTime,
-            'endTime': endTime,
-            'locationName': locationName,
-            'latitude': latitude,
-            'longitude': longitude,
-            'TravelMode': TravelMode,
-            'Color': Color,
-          });
-      print("Appointment created successfully");
-    } catch (e) {
-      print("Error creating appointment: $e");
-      throw e; // Re-throw the error for further handling
-    }
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('appointments')
+        .add({
+          'uid': uid,
+          'title': title,
+          'description': description,
+          'startTime': Timestamp.fromDate(
+            startTime,
+          ), // Convert to Firestore timestamp
+          'endTime': Timestamp.fromDate(
+            endTime,
+          ), // Convert to Firestore timestamp
+          'locationName': locationName,
+          'latitude': latitude,
+          'longitude': longitude,
+          'TravelMode': travelMode,
+          'Color': color,
+          'participants': participants, // Save participants to Firestore
+        });
   }
 
   Future<List<Map<String, dynamic>>> getAppointments(String userId) async {
@@ -163,32 +164,36 @@ class FirestoreAccess {
     String appointmentId,
     String title,
     String description,
-    DateTime startDateTime,
-    DateTime endDateTime,
-    String destinationName,
-    double destinationLatitude,
-    double destinationLongitude,
-    String transport,
+    DateTime startTime,
+    DateTime endTime,
+    String locationName,
+    double latitude,
+    double longitude,
+    String travelMode,
     String color,
+    List<Map<String, dynamic>> participants, // Add participants parameter
   ) async {
-    print("uid: $uid");
-    print("appointmentId: $appointmentId");
-    final docRef = FirebaseFirestore.instance
+    await FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
         .collection('appointments')
-        .doc(appointmentId);
-
-    await docRef.update({
-      'title': title,
-      'description': description,
-      'startTime': startDateTime,
-      'endTime': endDateTime,
-      'locationName': destinationName,
-      'latitude': destinationLatitude,
-      'longitude': destinationLongitude,
-      'TravelMode': transport,
-      'Color': color,
-    });
+        .doc(appointmentId)
+        .update({
+          'uid': uid,
+          'title': title,
+          'description': description,
+          'startTime': Timestamp.fromDate(
+            startTime,
+          ), // Convert to Firestore timestamp
+          'endTime': Timestamp.fromDate(
+            endTime,
+          ), // Convert to Firestore timestamp
+          'locationName': locationName,
+          'latitude': latitude,
+          'longitude': longitude,
+          'TravelMode': travelMode,
+          'Color': color,
+          'participants': participants, // Update participants in Firestore
+        });
   }
 }

@@ -14,20 +14,27 @@ import 'pages/auth/login.dart';
 import 'dart:async';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
-import 'service/firebaseServices.dart'; // Import your Firestore service
-import 'package:location/location.dart'; // Add this import
-import 'dart:convert'; // Add this import for JSON encoding/decoding
-import 'package:http/http.dart' as http; // Add this import for HTTP requests
+import 'service/firebaseServices.dart';
+import 'package:location/location.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   String accessToken =
       "pk.eyJ1IjoiYXJ0aHVybWV5ZnJvaWR0IiwiYSI6ImNtYTNseDMyajE2MzYyaXNmN2pxZmRqZ2EifQ.vV10oj7eLmsUgyAU9zb0sQ";
   MapboxOptions.setAccessToken(accessToken);
 
   runApp(const MyApp());
+}
+
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  print("Handling a background message: ${message.messageId}");
 }
 
 class MyApp extends StatefulWidget {
@@ -46,6 +53,7 @@ class _MyAppState extends State<MyApp> {
   double _currentLatitude = 0.0;
   double _currentLongitude = 0.0;
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  Set<String> _notifiedAppointments = {}; // Track notified appointments
 
   @override
   void initState() {
@@ -54,13 +62,86 @@ class _MyAppState extends State<MyApp> {
     _initialPage = _getInitialPage();
     _initializeNotifications();
     _startAppointmentFetchTimer();
+    _setupFirebaseMessaging();
   }
 
   @override
   void dispose() {
-    _appointmentFetchTimer
-        ?.cancel(); // Cancel the timer when the widget is disposed
+    _appointmentFetchTimer?.cancel();
     super.dispose();
+  }
+
+  void _setupFirebaseMessaging() async {
+    NotificationSettings settings = await FirebaseMessaging.instance
+        .requestPermission(alert: true, badge: true, sound: true);
+
+    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      print('User granted permission');
+    } else if (settings.authorizationStatus ==
+        AuthorizationStatus.provisional) {
+      print('User granted provisional permission');
+    } else {
+      print('User declined or has not accepted permission');
+    }
+
+    String? fcmToken = await FirebaseMessaging.instance.getToken();
+    if (fcmToken != null) {
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('public_users')
+            .doc(user.uid)
+            .set({'fcmToken': fcmToken}, SetOptions(merge: true));
+        print('FCM Token saved: $fcmToken');
+      }
+    }
+
+    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('public_users')
+            .doc(user.uid)
+            .set({'fcmToken': newToken}, SetOptions(merge: true));
+        print('FCM Token updated: $newToken');
+      }
+    });
+
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      print(
+        'Received a message in the foreground: ${message.notification?.title}',
+      );
+      if (message.notification != null) {
+        _showNotification(
+          message.notification!.title ?? 'No Title',
+          message.notification!.body ?? 'No Body',
+        );
+      }
+    });
+
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      print(
+        'Notification clicked and app opened: ${message.notification?.title}',
+      );
+    });
+  }
+
+  Future<void> _showNotification(String title, String body) async {
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          'default_channel',
+          'Default Notifications',
+          channelDescription: 'Channel for default notifications',
+          importance: Importance.max,
+          priority: Priority.high,
+          playSound: true,
+        );
+
+    const NotificationDetails platformDetails = NotificationDetails(
+      android: androidDetails,
+    );
+
+    await flutterLocalNotificationsPlugin.show(0, title, body, platformDetails);
   }
 
   void _startAppointmentFetchTimer() {
@@ -73,7 +154,6 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _fetchUpcomingAppointments() async {
     try {
-      // Fetch the current location using the Location package
       Location location = Location();
 
       bool serviceEnabled = await location.serviceEnabled();
@@ -81,8 +161,8 @@ class _MyAppState extends State<MyApp> {
         serviceEnabled = await location.requestService();
         if (!serviceEnabled) {
           print("Location services are disabled.");
-          _currentLatitude = 0.0; // Fallback to default value
-          _currentLongitude = 0.0; // Fallback to default value
+          _currentLatitude = 0.0;
+          _currentLongitude = 0.0;
           return;
         }
       }
@@ -92,8 +172,8 @@ class _MyAppState extends State<MyApp> {
         permissionGranted = await location.requestPermission();
         if (permissionGranted != PermissionStatus.granted) {
           print("Location permissions are denied.");
-          _currentLatitude = 0.0; // Fallback to default value
-          _currentLongitude = 0.0; // Fallback to default value
+          _currentLatitude = 0.0;
+          _currentLongitude = 0.0;
           return;
         }
       }
@@ -112,8 +192,8 @@ class _MyAppState extends State<MyApp> {
       FirestoreAccess firestoreAccess = FirestoreAccess();
       List<Map<String, dynamic>> appointments = await firestoreAccess
           .getAppointments(userId);
+      print("Fetched ${appointments.length} appointments.");
 
-      // Filter appointments to only include upcoming ones
       DateTime now = DateTime.now();
       List<Map<String, dynamic>> upcomingAppointments =
           appointments.where((appointment) {
@@ -130,7 +210,6 @@ class _MyAppState extends State<MyApp> {
         print("Location Name: ${appointment['locationName']}");
         print("Travel Mode: ${appointment['TravelMode']}");
 
-        // Calculate travel time using the _getRoute method
         double travelTime = await _calculateTravelTime(
           _currentLatitude,
           _currentLongitude,
@@ -139,10 +218,8 @@ class _MyAppState extends State<MyApp> {
           appointment['TravelMode'],
         );
 
-        // Add 30 minutes to the travel time
         travelTime += 30;
 
-        // Calculate when to leave
         DateTime startTime = (appointment['startTime'] as Timestamp).toDate();
         DateTime leaveTime = startTime.subtract(
           Duration(minutes: travelTime.toInt()),
@@ -161,9 +238,12 @@ class _MyAppState extends State<MyApp> {
         print(
           "Difference in minutes: ${leaveTime.toLocal().difference(DateTime.now().toLocal()).inMinutes}",
         );
-        if ((leaveTime.toLocal().difference(DateTime.now().toLocal()).inMinutes)
-                .abs() <=
-            0) {
+
+        // Check if the notification has already been sent
+        if (!_notifiedAppointments.contains(appointment['title']) &&
+            (leaveTime.toLocal().difference(DateTime.now().toLocal()).inMinutes)
+                    .abs() <=
+                1) {
           print(
             "Sending notification for appointment: ${appointment['title']}",
           );
@@ -177,7 +257,6 @@ class _MyAppState extends State<MyApp> {
                 playSound: true,
                 enableVibration: true,
               );
-
           const NotificationDetails platformDetails = NotificationDetails(
             android: androidDetails,
           );
@@ -187,7 +266,6 @@ class _MyAppState extends State<MyApp> {
                 (appointment['startTime'] as Timestamp).toDate();
             String formattedTime = DateFormat('HH:mm').format(startTime);
 
-            // Create a new map with only the required fields
             Map<String, dynamic> filteredAppointment = {
               'TravelMode': appointment['TravelMode'],
               'latitude': appointment['latitude'],
@@ -200,11 +278,12 @@ class _MyAppState extends State<MyApp> {
               "Afspraak ${appointment['title']} om $formattedTime",
               'Je moet nu vertrekken om ${appointment['locationName']} te bereiken voor je afspraak.',
               platformDetails,
-              payload: jsonEncode(
-                filteredAppointment,
-              ), // Send only the filtered map
+              payload: jsonEncode(filteredAppointment),
             );
-            print("Test notification sent successfully");
+
+            // Mark this appointment as notified
+            _notifiedAppointments.add(appointment['title']);
+            print("Notification sent successfully for ${appointment['title']}");
           } catch (e) {
             print("Error showing afspraak melding: $e");
           }
@@ -216,7 +295,6 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
-  // Helper method to calculate travel time using OpenRouteService API
   Future<double> _calculateTravelTime(
     double startLat,
     double startLon,
@@ -243,35 +321,22 @@ class _MyAppState extends State<MyApp> {
       },
       body: body,
     );
-
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       final segment = data['features'][0]['properties']['segments'][0];
-      final duration = segment['duration'] / 60; // Duration in minutes
+      final duration = segment['duration'] / 60;
       return duration;
     } else {
       print("Error fetching route: ${response.statusCode}");
       print(response.body);
-      return 0.0; // Return 0.0 if the API call fails
+      return 0.0;
     }
   }
 
-  bool _areAppointmentsEqual(Map<String, dynamic> a, Map<String, dynamic> b) {
-    return a['title'] == b['title'] &&
-        a['latitude'] == b['latitude'] &&
-        a['longitude'] == b['longitude'] &&
-        a['locationName'] == b['locationName'] &&
-        a['TravelMode'] == b['TravelMode'] &&
-        a['StartTime'] == b['StartTime'] &&
-        a['EndTime'] == b['EndTime'];
-  }
-
   Future<void> _initializeNotifications() async {
-    // Define the notification channel for Android
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    // Define iOS settings if needed
     final DarwinInitializationSettings initializationSettingsIOS =
         DarwinInitializationSettings(
           requestAlertPermission: true,
@@ -279,22 +344,16 @@ class _MyAppState extends State<MyApp> {
           requestSoundPermission: true,
         );
 
-    // Combine platform-specific settings
     final InitializationSettings initializationSettings =
         InitializationSettings(
           android: initializationSettingsAndroid,
           iOS: initializationSettingsIOS,
         );
-
-    // Initialize the plugin
     await flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse details) {
-        // Extract appointment details from the notification payload
         if (details.payload != null) {
           final Map<String, dynamic> appointment = jsonDecode(details.payload!);
-
-          // Navigate to the LocationPage
           Navigator.push(
             navigatorKey.currentContext!,
             MaterialPageRoute(
@@ -366,19 +425,6 @@ class _MyAppState extends State<MyApp> {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
             Widget homePage = snapshot.data!;
-
-            // Wrap the home page with a notification test button if in debug mode
-            if (snapshot.data is Planning) {
-              return Scaffold(
-                body: homePage,
-                floatingActionButton: FloatingActionButton(
-                  onPressed: showTestNotification,
-                  tooltip: 'Test Notification',
-                  child: Icon(Icons.notifications),
-                ),
-              );
-            }
-
             return homePage;
           } else {
             return const Center(child: CircularProgressIndicator());
