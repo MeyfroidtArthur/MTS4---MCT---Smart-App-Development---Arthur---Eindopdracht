@@ -1,0 +1,10 @@
+// Copy this file to config.dart and replace with your actual API keys
+// IMPORTANT: Never commit the real config.dart file to version control
+
+class Config {
+  // Get your Mapbox access token from: https://account.mapbox.com/access-tokens/
+  static const String mapboxAccessToken = "YOUR_MAPBOX_ACCESS_TOKEN_HERE";
+  
+  // Get your OpenRouteService API key from: https://openrouteservice.org/dev/#/signup
+  static const String openRouteServiceApiKey = "YOUR_OPENROUTESERVICE_API_KEY_HERE";
+}
