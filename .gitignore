@@ -43,3 +43,18 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Environment files - SENSITIVE DATA
+*.env
+agenda.env
+
+# Firebase configuration files - SENSITIVE DATA
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+lib/firebase_options.dart
+
+# Local properties - SENSITIVE DATA
+android/local.properties
+
+# API keys and configuration - SENSITIVE DATA
+lib/config.dart
